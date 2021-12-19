@@ -4635,4 +4635,15 @@ bool TWPartitionManager::Check_Pending_Merges() {
 	}
 	return true;
 }
+
+void TWPartitionManager::Refresh_Mounting_Info(void) {
+	if (!DataManager::GetIntValue("tw_mount_system_ro")) {
+		std::vector<TWPartition*>::iterator iter;
+		for (iter = Partitions.begin(); iter != Partitions.end(); iter++) {
+			if ((*iter)->Is_Super) {
+				(*iter)->Change_Mount_Read_Only(false);
+			}
+		}
+	}
+}
 //*
