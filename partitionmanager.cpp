@@ -423,12 +423,8 @@ void TWPartitionManager::Decrypt_Data() {
 	TWPartition* Decrypt_Data = Find_Partition_By_Path("/data");
 	if (Decrypt_Data && Decrypt_Data->Is_Encrypted && !Decrypt_Data->Is_Decrypted) {
 		Set_Crypto_State();
-		TWPartition* Key_Directory_Partition = Find_Partition_By_Path(Decrypt_Data->Key_Directory);
-		if (Key_Directory_Partition != nullptr)
-			if (!Key_Directory_Partition->Is_Mounted())
-				Mount_By_Path(Decrypt_Data->Key_Directory, false);
-		if (!Decrypt_Data->Key_Directory.empty()) {
-			Set_Crypto_Type("file");
+		if (!Decrypt_Data->Key_Directory.empty() && Mount_By_Path(Decrypt_Data->Key_Directory, false)) {
+		Set_Crypto_Type("file");
 #ifdef TW_INCLUDE_FBE_METADATA_DECRYPT
 #ifdef USE_FSCRYPT
 			if (fscrypt_mount_metadata_encrypted(Decrypt_Data->Actual_Block_Device, Decrypt_Data->Mount_Point, false)) {
@@ -483,7 +479,8 @@ void TWPartitionManager::Decrypt_Data() {
 			}
 		}
 	}
-	if (Decrypt_Data && (!Decrypt_Data->Is_Encrypted || Decrypt_Data->Is_Decrypted)) {
+	if (Decrypt_Data && (!Decrypt_Data->Is_Encrypted || Decrypt_Data->Is_Decrypted) &&
+	Decrypt_Data->Mount(false)) {
 		Decrypt_Adopted();
 	}
 #endif
@@ -1904,10 +1901,8 @@ void TWPartitionManager::Post_Decrypt(const string& Block_Device) {
 		}
 		Update_System_Details();
 		Output_Partition(dat);
-		if (!android::base::StartsWith(dat->Actual_Block_Device, "/dev/block/mmcblk")) {
 		if (!dat->Bind_Mount(false))
 			LOGERR("Unable to bind mount /sdcard to %s\n", dat->Storage_Path.c_str());
-		}
 	} else
 		LOGERR("Unable to locate data partition.\n");
 }

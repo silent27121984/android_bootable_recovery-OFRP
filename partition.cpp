@@ -676,6 +676,8 @@ void TWPartition::Setup_Data_Partition(bool Display_Error) {
 	UnMount(false);
 
 #ifdef TW_INCLUDE_CRYPTO
+	if (datamedia)
+		Setup_Data_Media();
 	Can_Be_Encrypted = true;
 	char crypto_blkdev[255];
 	property_get("ro.crypto.fs_crypto_blkdev", crypto_blkdev, "error");
@@ -683,8 +685,6 @@ void TWPartition::Setup_Data_Partition(bool Display_Error) {
 		Set_FBE_Status();
 		Decrypted_Block_Device = crypto_blkdev;
 		LOGINFO("Data already decrypted, new block device: '%s'\n", crypto_blkdev);
-		if (datamedia)
-			Setup_Data_Media();
 		DataManager::SetValue(TW_IS_ENCRYPTED, 0);
 		DataManager::SetValue(FOX_ENCRYPTED_DEVICE, "1");
 	} else if (!Mount(false)) {
@@ -702,8 +702,6 @@ void TWPartition::Setup_Data_Partition(bool Display_Error) {
 					DataManager::SetValue("tw_crypto_pwtype_0", cryptfs_get_password_type());
 					DataManager::SetValue(TW_CRYPTO_PASSWORD, "");
 					DataManager::SetValue("tw_crypto_display", "");
-					if (datamedia)
-						Setup_Data_Media();
 				} else {
 					gui_err("mount_data_footer=Could not mount /data and unable to find crypto footer.");
 				}
@@ -731,8 +729,6 @@ void TWPartition::Setup_Data_Partition(bool Display_Error) {
 			}
 		} else {
 			DataManager::SetValue(TW_IS_ENCRYPTED, 0);
-			if (datamedia)
-				Setup_Data_Media();
 		}
 	}
 	if (datamedia && (!Is_Encrypted || (Is_Encrypted && Is_Decrypted))) {
@@ -1261,8 +1257,7 @@ void TWPartition::Setup_Data_Media() {
 			Make_Dir("/sdcard", false);
 			Symlink_Mount_Point = "/sdcard";
 		}
-		Mount(false); 
-		if (TWFunc::Path_Exists(Mount_Point + "/media/0")) {
+		if (Mount(false) && TWFunc::Path_Exists(Mount_Point + "/media/0")) {
 			Storage_Path = Mount_Point + "/media/0";
 			Symlink_Path = Storage_Path;
 			DataManager::SetValue(TW_INTERNAL_PATH, Mount_Point + "/media/0");
@@ -1691,7 +1686,7 @@ bool TWPartition::Mount(bool Display_Error) {
 	if (Removable)
 		Update_Size(Display_Error);
 
-	if (!Symlink_Mount_Point.empty()/* && Symlink_Mount_Point != "/sdcard"*/) {
+	if (!Symlink_Mount_Point.empty()) {
 		if (!Bind_Mount(false))
 			return false;
 	}
@@ -1962,15 +1957,12 @@ bool TWPartition::Repair() {
 		command = "/system/bin/fsck.f2fs " + Actual_Block_Device;
 		LOGINFO("Repair command: %s\n", command.c_str());
 		// try to unbind /sdcard if it is still bind-mounted
-		#ifdef OF_UNBIND_SDCARD_F2FS
 		if (Mount_Point == "/data") {
 			LOGINFO("OrangeFox: bind-unmounting /sdcard before f2fs data repair...\n");
 			usleep(32768);
-			string nul;
-			TWFunc::Exec_Cmd("umount /sdcard", nul);
+			TWFunc::Exec_Cmd("umount /sdcard", false);
 			usleep(32768);
 		}
-		#endif
 		if (TWFunc::Exec_Cmd(command) == 0) {
 			gui_msg("done=Done.");
 			return true;
@@ -2570,15 +2562,12 @@ bool TWPartition::Wipe_F2FS() {
 	}
 	LOGINFO("mkfs.f2fs command: %s\n", f2fs_command.c_str());
 	// try to unbind /sdcard if it is still bind-mounted
-	#ifdef OF_UNBIND_SDCARD_F2FS
 		if (Mount_Point == "/data") {
 			LOGINFO("OrangeFox: bind-unmounting /sdcard before f2fs data format...\n");
 			usleep(32768);
-			string nul;
-			TWFunc::Exec_Cmd("umount /sdcard", nul);
+			TWFunc::Exec_Cmd("umount /sdcard", false);
 			usleep(32768);
 		}
-	#endif
 	if (TWFunc::Exec_Cmd(f2fs_command) == 0) {
 		if (NeedPreserveFooter)
 			Wipe_Crypto_Key();
