@@ -4639,7 +4639,7 @@ void TWPartitionManager::Refresh_Mounting_Info(void) {
 			if ((*iter)->Is_Super) {
 				(*iter)->Change_Mount_Read_Only(false);
 				command = "blockdev --setrw /dev/block/mapper/" + Get_Bare_Partition_Name((*iter)->Get_Mount_Point());
-				TWFunc::Exec_Cmd(command);
+				TWFunc::Exec_Cmd(command, false);
 			}
 		}
 	}
