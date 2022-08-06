@@ -765,15 +765,15 @@ void DataManager::SetDefaultValues()
   
   property_get("fox.status.left.offset", propval, "");
    if (strlen(propval) > 0)
-	mConst.SetValue(OF_STATUS_INDENT_LEFT_S, propval);
+	mData.SetValue(OF_STATUS_INDENT_LEFT_S, propval);
    else
-	mConst.SetValue(OF_STATUS_INDENT_LEFT_S, OF_STATUS_INDENT_LEFT);
+	mData.SetValue(OF_STATUS_INDENT_LEFT_S, OF_STATUS_INDENT_LEFT);
 
   property_get("fox.status.right.offset", propval, "");
    if (strlen(propval) > 0)
-	mConst.SetValue(OF_STATUS_INDENT_RIGHT_S, propval);
+	mData.SetValue(OF_STATUS_INDENT_RIGHT_S, propval);
    else
-	mConst.SetValue(OF_STATUS_INDENT_RIGHT_S, OF_STATUS_INDENT_RIGHT);
+	mData.SetValue(OF_STATUS_INDENT_RIGHT_S, OF_STATUS_INDENT_RIGHT);
 
   mConst.SetValue(OF_CLOCK_POS_S, OF_CLOCK_POS);
   mConst.SetValue(OF_ALLOW_DISABLE_NAVBAR_S, OF_ALLOW_DISABLE_NAVBAR);
