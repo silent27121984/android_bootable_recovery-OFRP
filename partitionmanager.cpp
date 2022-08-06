@@ -307,6 +307,8 @@ void TWPartitionManager::Setup_Fstab_Partitions(bool Display_Error) {
 				Prepare_Super_Volume((*iter));
 		}
 
+		Unlock_Block_Partitions();
+
 		//Setup Apex before decryption
 		TWPartition* sys = PartitionManager.Find_Partition_By_Path(PartitionManager.Get_Android_Root_Path());
 		TWPartition* ven = PartitionManager.Find_Partition_By_Path("/vendor");
@@ -508,9 +510,11 @@ void TWPartitionManager::Fox_Set_Dynamic_Partition_Props() {
   	if (Get_Super_Status()) {
   		TWFunc::Fox_Property_Set("orangefox.super.partition", "true");
   		DataManager::SetValue(TW_IS_SUPER, "1");
+  		DataManager::SetValue("fox_dynamic_device", "1");
   	}
   	else {
   		TWFunc::Fox_Property_Set("orangefox.super.partition", "false");
+  		DataManager::SetValue("fox_dynamic_device", "0");
   	}
 
   	TWPartition* Part;
@@ -3052,8 +3056,6 @@ bool TWPartitionManager::Flash_Image(string& path, string& filename) {
 
 	full_filename = path + "/" + filename;
 
-	Unlock_Block_Partitions();
-
 	gui_msg("image_flash_start=[IMAGE FLASH STARTED]");
 	gui_msg(Msg("img_to_flash=Image to flash: '{1}'")(full_filename));
 
@@ -3282,12 +3284,6 @@ bool TWPartitionManager::Decrypt_Adopted()
   string path = "/data/system/storage.xml";
   if (SDK > 30 && TWFunc::Path_Exists(path)) {
       	if(!TWFunc::Check_Xml_Format(path)) {
-         	/*
-         	string newpath = TWFunc::abx_to_xml_string(path);
-         	if (!newpath.empty()) {
-         		path = newpath;
-         	}
-         	*/
          	string oldpath = path;
          	if (TWFunc::abx_to_xml(path, path)) {
          		LOGINFO("Android 12+: '%s' has been converted into plain text xml (%s).\n", oldpath.c_str(), path.c_str());
@@ -4443,7 +4439,6 @@ bool TWPartitionManager::Prepare_Super_Volume(TWPartition* twrpPart) {
 
 	twrpPart->Set_Block_Device(fstabEntry.blk_device);
 	twrpPart->Update_Size(true);
-	twrpPart->Change_Mount_Read_Only(true);
 	twrpPart->Set_Can_Be_Backed_Up(false);
 	twrpPart->Set_Can_Be_Wiped(false);
 
@@ -4579,7 +4574,7 @@ void TWPartitionManager::Unlock_Block_Partitions() {
 					continue;
 				}
 				if (ioctl(fd, BLKROSET, &OFF) == -1) {
-					LOGERR("Unable to unlock %s for flashing: %s\n", block_device.c_str());
+					LOGERR("Unable to unlock %s: %s\n", block_device.c_str());
 					continue;
 				}
 				close(fd);
@@ -4595,12 +4590,15 @@ bool TWPartitionManager::Unmap_Super_Devices() {
 	twrpApex apex;
 	apex.Unmount();
 #endif
+	LOGINFO("Unmap_Super_Devices\n");
 	for (auto iter = Partitions.begin(); iter != Partitions.end();) {
 		LOGINFO("Checking partition: %s\n", (*iter)->Get_Mount_Point().c_str());
 		if ((*iter)->Is_Super) {
 			TWPartition *part = *iter;
 			std::string bare_partition_name = Get_Bare_Partition_Name((*iter)->Get_Mount_Point());
-			std::string blk_device_partition = bare_partition_name + PartitionManager.Get_Active_Slot_Suffix();
+			std::string blk_device_partition = bare_partition_name;
+			if (DataManager::GetIntValue("of_ab_device") == 1)
+				blk_device_partition.append(PartitionManager.Get_Active_Slot_Suffix());
 			(*iter)->UnMount(false);
 			LOGINFO("removing dynamic partition: %s\n", blk_device_partition.c_str());
 			destroyed = DestroyLogicalPartition(blk_device_partition);

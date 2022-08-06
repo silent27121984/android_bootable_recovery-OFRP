@@ -50,6 +50,7 @@
 #include <android-base/chrono_utils.h>
 
 #include "twrp-functions.hpp"
+#include "abx-functions.hpp"
 #include "twcommon.h"
 #include "gui/gui.hpp"
 #ifndef BUILD_TWRPTAR_MAIN
@@ -4138,43 +4139,6 @@ void TWFunc::List_Mounts() {
 	}
 }
 
-#ifdef TW_INCLUDE_CRYPTO
-#ifdef USE_FSCRYPT_POLICY_V1
-bool TWFunc::Get_Encryption_Policy(struct fscrypt_policy_v1 &policy, std::string path) {
-#else
-bool TWFunc::Get_Encryption_Policy(struct fscrypt_policy_v2 &policy, std::string path) {
-#endif
-	if (!TWFunc::Path_Exists(path)) {
-		LOGERR("Unable to find %s to get policy\n", path.c_str());
-		return false;
-	}
-	if (!fscrypt_policy_get_struct(path.c_str(), &policy)) {
-		LOGERR("No policy set for path %s\n", path.c_str());
-		return false;
-	}
-	return true;
-}
-
-#ifdef USE_FSCRYPT_POLICY_V1
-bool TWFunc::Set_Encryption_Policy(std::string path, struct fscrypt_policy_v1 &policy) {
-#else
-bool TWFunc::Set_Encryption_Policy(std::string path, struct fscrypt_policy_v2 &policy) {
-#endif
-	if (!TWFunc::Path_Exists(path)) {
-		LOGERR("unable to find %s to set policy\n", path.c_str());
-		return false;
-	}
-	uint8_t binary_policy[FS_KEY_DESCRIPTOR_SIZE];
-	char policy_hex[FSCRYPT_KEY_IDENTIFIER_HEX_SIZE];
-	bytes_to_hex(binary_policy, FS_KEY_DESCRIPTOR_SIZE, policy_hex);
-	if (!fscrypt_policy_set_struct(path.c_str(), &policy)) {
-		LOGERR("unable to set policy for path: %s\n", path.c_str());
-		return false;
-	}
-	return true;
-}
-#endif
-
 #endif // ndef BUILD_TWRPTAR_MAIN
 
 void TWFunc::Deactivation_Process(void)
@@ -4847,7 +4811,7 @@ bool TWFunc::Fox_Property_Set(const std::string Prop_Name, const std::string Val
 }
 
 bool TWFunc::Has_Dynamic_Partitions(void) {
-	return (Fox_Property_Get("ro.boot.dynamic_partitions") == "true");
+	return (Fox_Property_Get("ro.boot.dynamic_partitions") == "true" || DataManager::GetIntValue("fox_dynamic_device") == 1);
 }
 
 bool TWFunc::Has_Virtual_AB_Partitions(void) {
@@ -4945,14 +4909,12 @@ bool TWFunc::Check_Xml_Format(const std::string filename) {
 // return false=an error happened (leave "result" alone)
 bool TWFunc::abx_to_xml(const std::string path, std::string &result) {
 	bool res = false;
-	std::string script = "/etc/python/scripts/ccl_abx.py";
-
-	std::string python = "/system/bin/python";
-	if (!Path_Exists(python))
-		python = "/sbin/python";
-
-	if (!TWFunc::Path_Exists(path) || !TWFunc::Path_Exists(python) || !TWFunc::Path_Exists(script))
+	if (!TWFunc::Path_Exists(path))
 		return res;
+
+	std::ifstream infile(path);
+	if (!infile.is_open())
+		return false;
 
 	std::string fname = TWFunc::Get_Filename(path);
 	std::string tmp = "/tmp/converted_xml";
@@ -4961,11 +4923,22 @@ bool TWFunc::abx_to_xml(const std::string path, std::string &result) {
 			tmp = "/tmp";
 	}
 	std::string tmp_path = tmp + "/" + fname;
-	std::string cmd = python + " " + script + " " + path + " -mr >" + tmp_path;
-	if (TWFunc::Exec_Cmd (cmd, false) == 0 && TWFunc::Path_Exists(tmp_path)) {
+	std::ofstream outfile(tmp_path);
+	if (!outfile.is_open()) {
+		LOGINFO("Error. The abx conversion of %s has failed.\n", path.c_str());
+		infile.close();
+		return res;
+	}
+
+	AbxToXml r(infile, outfile);
+	if (r.run() && TWFunc::Path_Exists(tmp_path)) {
 		res = true;
 		result = tmp_path;
 	}
+
+	infile.close();
+	outfile.close();
+
 	return res;
 }
 

@@ -479,22 +479,25 @@ bool TWPartition::Process_Fstab_Line(const char *fstab_line, bool Display_Error,
 			Wipe_Available_in_GUI = false;
 			Can_Be_Backed_Up = false;
 			Can_Be_Wiped = false;
-			Mount_Read_Only = true;
 			Make_Dir(PartitionManager.Get_Android_Root_Path(), true);
+		} else if (Mount_Point == "/system_ext") {
+			Display_Name = "System_EXT";
+			Backup_Name = "System_EXT";
+			Backup_Display_Name = Display_Name;
+			Storage_Name = Display_Name;
+			Can_Be_Backed_Up = Wipe_Available_in_GUI = Is_Super ? false : true;
 		} else if (Mount_Point == "/product") {
 			Display_Name = "Product";
 			Backup_Name = "Product";
 			Backup_Display_Name = Display_Name;
 			Storage_Name = Display_Name;
 			Can_Be_Backed_Up = Wipe_Available_in_GUI = Is_Super ? false : true;
-			Mount_Read_Only = true;
 		} else if (Mount_Point == "/odm") {
 			Display_Name = "ODM";
 			Backup_Name = "ODM";
 			Backup_Display_Name = Display_Name;
 			Storage_Name = Display_Name;
 			Can_Be_Backed_Up = Wipe_Available_in_GUI = Is_Super ? false : true;
-			Mount_Read_Only = true;
 		} else if (Mount_Point == "/data") {
 			Display_Name = "Data";
 			Backup_Display_Name = Display_Name;
@@ -541,7 +544,6 @@ bool TWPartition::Process_Fstab_Line(const char *fstab_line, bool Display_Error,
 			Display_Name = "Vendor";
 			Backup_Display_Name = Display_Name;
 			Storage_Name = Display_Name;
-			Mount_Read_Only = true;
 		}
 #ifdef TW_EXTERNAL_STORAGE_PATH
 		if (Mount_Point == EXPAND(TW_EXTERNAL_STORAGE_PATH)) {
@@ -1270,6 +1272,7 @@ void TWPartition::Setup_Data_Media() {
 		backup_exclusions.add_absolute_dir("/data/extm"); // DJ9,5July2020 - exclude this dir to prevent "error 255" on MIUI 12 ROMs
 		backup_exclusions.add_absolute_dir("/data/bootchart"); // DJ9,3Aug2020 - exclude this dir to error 255
 		backup_exclusions.add_absolute_dir("/data/vendor/dumpsys"); // DJ9,3Aug2020 - exclude this dir to error 255
+		backup_exclusions.add_absolute_dir("/data/fonts"); // exclude this dir to prevent "error 255" on AOSP Android 12
 		backup_exclusions.add_absolute_dir("/data/misc/apexdata/com.android.art"); // exclude this dir to prevent "error 255" on AOSP Android 12
 		// ---
 		wipe_exclusions.add_absolute_dir(Mount_Point + "/misc/vold"); // adopted storage keys
