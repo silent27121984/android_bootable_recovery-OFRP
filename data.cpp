@@ -993,6 +993,10 @@ void DataManager::SetDefaultValues()
 	mConst.SetValue(TW_EDL_MODE, "1");
 #endif
 
+#ifdef TW_INCLUDE_FASTBOOTD
+	printf("TW_INCLUDE_FASTBOOTD := true\n");
+	mConst.SetValue(TW_FASTBOOT_MODE, "1");
+#endif
 #ifdef PRODUCT_USE_DYNAMIC_PARTITIONS
 	printf("PRODUCT_USE_DYNAMIC_PARTITIONS := true\n");
 	mConst.SetValue(TW_FASTBOOT_MODE, "1");
@@ -1133,6 +1137,12 @@ void DataManager::SetDefaultValues()
   mData.SetValue("found_fox_overwriting_rom", 0);
   mData.SetValue("fox_dfe_formatted", "0"); // whether data has been formatted with disable forced encryption enabled
   mPersist.SetValue(FOX_USE_F2FS_COMPRESSION , "0");
+
+  // the canonical current device
+  mConst.SetValue("fox_product_device", TWFunc::Fox_Property_Get("ro.product.device"));
+
+  // whether we are processing any asserts
+  mData.SetValue("fox_processing_asserts", "0");
 
   // End of the OrangeFox variables
 

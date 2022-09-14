@@ -326,6 +326,7 @@ ifeq ($(TW_INCLUDE_CRYPTO), true)
     TW_INCLUDE_CRYPTO_FBE := true
     LOCAL_CFLAGS += -DTW_INCLUDE_FBE
     LOCAL_SHARED_LIBRARIES += android.frameworks.stats@1.0 android.hardware.authsecret@1.0 \
+	android.security.authorization-ndk_platform \
         android.hardware.oemlock@1.0 libf2fs_sparseblock libbinder libbinder_ndk \
         libandroidicu.recovery \
         android.hardware.gatekeeper@1.0 \
@@ -337,9 +338,7 @@ ifeq ($(TW_INCLUDE_CRYPTO), true)
         liblog \
         libsqlite.recovery \
         libkeystoreinfo.recovery \
-        libgatekeeper_aidl \
-        libcppbor_external \
-        libcppcose_rkp
+        libgatekeeper_aidl
 
     LOCAL_STATIC_LIBRARIES += libkeymint_support
 
@@ -447,6 +446,12 @@ endif
 ifneq ($(TARGET_OTA_ASSERT_DEVICE),)
     LOCAL_CFLAGS += -DTARGET_OTA_ASSERT_DEVICE='"$(TARGET_OTA_ASSERT_DEVICE)"'
 endif
+ifneq ($(TW_BACKUP_EXCLUSIONS),)
+    LOCAL_CFLAGS += -DTW_BACKUP_EXCLUSIONS='"$(TW_BACKUP_EXCLUSIONS)"'
+endif
+ifeq ($(TW_INCLUDE_FASTBOOTD), true)
+    LOCAL_CFLAGS += -DTW_INCLUDE_FASTBOOTD
+endif
 
 LOCAL_C_INCLUDES += system/vold \
 
@@ -524,6 +529,8 @@ TWRP_REQUIRED_MODULES += \
     vold_prepare_subdirs \
     task_recovery_profiles.json \
     fscryptpolicyget.recovery \
+    keystore_auth \
+    keystore2 \
     android.system.keystore2-service.xml \
     keystore2.rc \
     plat_keystore2_key_contexts

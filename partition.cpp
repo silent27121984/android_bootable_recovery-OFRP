@@ -698,10 +698,29 @@ void TWPartition::Setup_Data_Partition(bool Display_Error) {
 	} else if (!Mount(false)) {
 		if (Is_Present) {
 			DataManager::SetValue(FOX_ENCRYPTED_DEVICE, "1");
-			Is_Encrypted = true;
-			Is_Decrypted = false;
-			if (datamedia)
-				Setup_Data_Media();
+			if (Key_Directory.empty()) {
+				set_partition_data(Use_Original_Path ? Original_Path.c_str() : Actual_Block_Device.c_str(), Crypto_Key_Location.c_str());
+				if (cryptfs_check_footer() == 0) {
+					Is_Encrypted = true;
+					Is_Decrypted = false;
+					Can_Be_Mounted = false;
+					Current_File_System = "emmc";
+					Setup_Image();
+					DataManager::SetValue(TW_CRYPTO_PWTYPE, cryptfs_get_password_type());
+					DataManager::SetValue("tw_crypto_pwtype_0", cryptfs_get_password_type());
+					DataManager::SetValue(TW_CRYPTO_PASSWORD, "");
+					DataManager::SetValue("tw_crypto_display", "");
+					if (datamedia)
+						Setup_Data_Media();
+				} else {
+					gui_err("mount_data_footer=Could not mount /data and unable to find crypto footer.");
+				}
+			} else {
+				Is_Encrypted = true;
+				Is_Decrypted = false;
+				if (datamedia)
+					Setup_Data_Media();
+			}
 		} else if (Key_Directory.empty()) {
 			LOGERR("Primary block device '%s' for mount point '%s' is not present!\n",
 			Primary_Block_Device.c_str(), Mount_Point.c_str());
@@ -1272,11 +1291,23 @@ void TWPartition::Setup_Data_Media() {
 		backup_exclusions.add_absolute_dir("/data/extm"); // DJ9,5July2020 - exclude this dir to prevent "error 255" on MIUI 12 ROMs
 		backup_exclusions.add_absolute_dir("/data/bootchart"); // DJ9,3Aug2020 - exclude this dir to error 255
 		backup_exclusions.add_absolute_dir("/data/vendor/dumpsys"); // DJ9,3Aug2020 - exclude this dir to error 255
-		backup_exclusions.add_absolute_dir("/data/fonts"); // exclude this dir to prevent "error 255" on AOSP Android 12
 		backup_exclusions.add_absolute_dir("/data/misc/apexdata/com.android.art"); // exclude this dir to prevent "error 255" on AOSP Android 12
 		// ---
 		wipe_exclusions.add_absolute_dir(Mount_Point + "/misc/vold"); // adopted storage keys
 		ExcludeAll(Mount_Point + "/system/storage.xml");
+
+		// board-customisable exclusions
+		#ifdef TW_BACKUP_EXCLUSIONS
+			std::vector<std::string> user_extra_exclusions = TWFunc::Split_String(TW_BACKUP_EXCLUSIONS, ",");
+			std::string s1;
+			for (const std::string& extra_x : user_extra_exclusions) {
+				s1 = TWFunc::trim(extra_x);
+				if (!s1.empty()) {
+					backup_exclusions.add_absolute_dir(s1);
+					LOGINFO("Adding user-defined path '%s' to the backup exclusions\n", s1.c_str());
+				}
+			}
+		#endif
 	} else {
 		int i;
 		string path;
@@ -3084,36 +3115,39 @@ bool TWPartition::Restore_Image(PartitionSettings *part_settings) {
 }
 
 bool TWPartition::Update_Size(bool Display_Error) {
-	bool ret = false, Was_Already_Mounted = false;
+	bool ret = false, Was_Already_Mounted = false, ro = false;
 
 	Find_Actual_Block_Device();
 
 	if (Actual_Block_Device.empty())
 		return false;
 
+	ro = Mount_Read_Only;
+	Mount_Read_Only = true;
+
 	if (!Can_Be_Mounted && !Is_Encrypted) {
 		if (TWFunc::Path_Exists(Actual_Block_Device) && Find_Partition_Size()) {
 			Used = Size;
 			Backup_Size = Size;
-			return true;
+			goto success;
 		}
-		return false;
+		goto fail;
 	}
 
 	Was_Already_Mounted = Is_Mounted();
 
 	if (Removable || Is_Encrypted) {
 		if (!Mount(false))
-			return true;
+			goto success;
 	} else if (!Mount(Display_Error))
-		return false;
+		goto fail;
 
 	ret = Get_Size_Via_statfs(Display_Error);
 	if (!ret || Size == 0) {
 		if (!Get_Size_Via_df(Display_Error)) {
 			if (!Was_Already_Mounted)
 				UnMount(false);
-			return false;
+			goto fail;
 		}
 	}
 
@@ -3127,7 +3161,7 @@ bool TWPartition::Update_Size(bool Display_Error) {
 		} else {
 			if (!Was_Already_Mounted)
 				UnMount(false);
-			return false;
+			goto fail;
 		}
 	} else if (Has_Android_Secure) {
 		if (Mount(Display_Error))
@@ -3135,12 +3169,17 @@ bool TWPartition::Update_Size(bool Display_Error) {
 		else {
 			if (!Was_Already_Mounted)
 				UnMount(false);
-			return false;
+			goto fail;
 		}
 	}
 	if (!Was_Already_Mounted)
 		UnMount(false);
+success:
+	Mount_Read_Only = ro;
 	return true;
+fail:
+	Mount_Read_Only = ro;
+	return false;
 }
 
 bool TWPartition::Find_Wildcard_Block_Devices(const string& Device) {
